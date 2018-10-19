@@ -8,25 +8,46 @@
 #include <ctime>
 #include <cstdlib>
 #include <cmath>
+#include <cassert>
 
 using namespace std;
 
+/**
+ * Frobenius norm
+ *   L1 BLAS の dnrm2() を使うべき
+ */
+double Fnorm( unsigned long m, double* a )
+{
+	double tmp = 0.0;
+
+	for(unsigned long i=0; i<m*m; i++)
+		tmp += a[i]*a[i];
+	return sqrt(tmp);
+}
+
 int main(const int argc, const char *argv[])
 {
-	if (argc < 2)
+	if (argc < 4)
 	{
-		cerr << "Usage: a.out [M]" << endl;
+		cerr << "Usage: a.out M p q" << endl;
 		exit(EXIT_FAILURE);
 	}
 
 	const unsigned long m = atoi(argv[1]);  // size of matrix
+	const unsigned long p = atoi(argv[2]);  // a[p][q], a[q][p] are bunished by Givens rotation
+	const unsigned long q = atoi(argv[3]);
+	assert((p<=m) && (q<=m));
+	assert(p<=q);
 
+	// Display size of matrix, element index
 	#ifdef DEBUG
-	cout << "m = " << m << endl << endl;
+	cout << "m = " << m << endl;
+	cout << "(p,q) = (" << p << "," << q << ")\n\n";
 	#endif
 
-	double *a = new double [m*m];
-	double *ad = new double [m*m];
+	double *a = new double [m*m];   // Original matrix
+	double *ad = new double [m*m];  // ad = g^{T} a g
+	double *g = new double [m*m];   // Transformation matrix
 
 	// Create random symmetric matrix
 	srand(time(NULL));
@@ -34,9 +55,9 @@ int main(const int argc, const char *argv[])
 		for (unsigned long j=0; j<=i; j++)
 			a[ i + m*j ] = a[ j + m*i ] = ad[i+m*j] = ad[j+m*i] = (double)rand() / RAND_MAX;
 
-
+	// Display matrix elements
 	#ifdef DEBUG
-
+	cout << "Matrix a:\n";
 	for (unsigned long i=0; i<m; i++)
 	{
 		for (unsigned long j=0; j<m; j++)
@@ -46,32 +67,23 @@ int main(const int argc, const char *argv[])
 	cout << endl;
 	#endif
 
-	const unsigned int p=3;
-	const unsigned int q=6;
-	assert((p<=m) && (q<=m));
-	assert(p<=q);
-
-	double th = M_PI/4.0;
-	double c = 1.0;
-	double s = 0.0;
-	double c2 = 1.0;
-	double s2 = 0.0;
+	double th;      // theta
+	double c, s;    // cos(theta), sin(theta)
+	double c2, s2;  // cos(2*theta), sin(2*theta)
 
 	if (a[p+m*p] != a[q+m*q])
-	{
-		th = atan( -2.0*a[p+m*q] / ( a[p+m*p] - a[q+m*q] ) );
+		th = atan( -2.0*a[p+m*q] / ( a[p+m*p] - a[q+m*q] ) ) / 2.0;
+	else
+		th = M_PI/4.0;
 
-		c2 = cos(th);
-		s2 = sin(th);
-
-		th /= 2.0;
-		c = cos(th);
-		s = sin(th);
-	}
+	#ifdef DEBUG
 	cout << "theta =" << th << endl;
+	#endif
+
+	c = cos(th);  s = sin(th);
+	c2 = cos(2.0*th);  s2 = sin(2.0*th);
 
 	double tmp = (a[p+m*p] - a[q+m*q])*s2/2.0 + a[p+m*q]*c2;
-//	cout << "ad[" << p << "," << q << "] = ad["  << q << "," << p << "] =" << tmp << endl << endl;
 
 	for (unsigned long i=0; i<m; i++)
 	{
@@ -131,14 +143,16 @@ int main(const int argc, const char *argv[])
 		}
 	}
 
+	// Display matrix emelemts
 	#ifdef DEBUG
+	cout << "\nMatrix ad:\n";
 	for (unsigned long i=0; i<m; i++)
 	{
 		for (unsigned long j=0; j<m; j++)
 			cout << ad[i+m*j] << ", ";
 		cout << endl;
 	}
-	cout << endl;
+	cout << "\nMatrix a - ad:\n";
 	for (unsigned long i=0; i<m; i++)
 	{
 		for (unsigned long j=0; j<m; j++)
@@ -148,8 +162,22 @@ int main(const int argc, const char *argv[])
 	cout << endl;
 	#endif
 
+	cout << "Norm(a) = " << Fnorm(m,a) << endl;
+	cout << "Norm(ad) = " << Fnorm(m,ad) << endl;
+
+	// Check routines
+	#ifdef DEBUG
+	for (unsigned long i=0; i<m; i++)
+		for (unsigned long j=0; j<m; j++)
+			g[i+m*j] = (i==j) ? 1.0 : 0.0;
+	g[p+m*p] = g[q+m*q] = c;
+	g[p+m*q] = s; g[q*m*p] = -s;
+
+	#endif
+
 	delete[] a;
 	delete[] ad;
+	delete[] g;
 
 	return EXIT_SUCCESS;
 }
