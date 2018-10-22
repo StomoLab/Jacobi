@@ -47,7 +47,11 @@ int main(const int argc, const char *argv[])
 
 	double *a = new double [m*m];   // Original matrix
 	double *ad = new double [m*m];  // ad = g^{T} a g
+
+	#ifdef DEBUG
 	double *g = new double [m*m];   // Transformation matrix
+	double *t = new double [m*m];   // Working matrix
+	#endif
 
 	// Create random symmetric matrix
 	srand(time(NULL));
@@ -171,13 +175,45 @@ int main(const int argc, const char *argv[])
 		for (unsigned long j=0; j<m; j++)
 			g[i+m*j] = (i==j) ? 1.0 : 0.0;
 	g[p+m*p] = g[q+m*q] = c;
-	g[p+m*q] = s; g[q*m*p] = -s;
+	g[p+m*q] = s; g[q+m*p] = -s;
 
+	// t <- g'*a
+	for (unsigned long i=0; i<m; i++)
+		for (unsigned long j=0; j<m; j++)
+		{
+			double tmp = 0.0;
+			for (unsigned long k=0; k<m; k++)
+				tmp += g[k+m*i]*a[k+m*j];
+			t[i+m*j] = tmp;
+		}
+	// a <- (g'*a)*g
+	for (unsigned long i=0; i<m; i++)
+		for (unsigned long j=0; j<m; j++)
+		{
+			double tmp = 0.0;
+			for (unsigned long k=0; k<m; k++)
+				tmp += t[i+m*k]*g[k+m*j];
+			a[i+m*j] = tmp;
+		}
+
+	// Check as matrix-matrix product
+	cout << "\nMatrix ad - g'*a*g:\n";
+	for (unsigned long i=0; i<m; i++)
+	{
+		for (unsigned long j=0; j<m; j++)
+			cout << a[i+m*j] - ad[i+m*j] << ", ";
+		cout << endl;
+	}
+	cout << endl;
 	#endif
 
 	delete[] a;
 	delete[] ad;
+
+	#ifdef DEBUG
 	delete[] g;
+	delete[] t;
+	#endif
 
 	return EXIT_SUCCESS;
 }
